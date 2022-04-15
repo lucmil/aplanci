@@ -1,0 +1,10 @@
+---
+- name: enable static ip on secondary interfaces
+  template:
+    src: templates/etc/systemd/network/99-static.network.j2
+    dest: /etc/systemd/network/99-static.network
+  notify:
+    - restart network
+
+- name: Flush handlers
+  meta: flush_handlers

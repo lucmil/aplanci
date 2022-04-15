@@ -1,0 +1,11 @@
+[Interface]
+ListenPort = {{ item.value.port }}
+PrivateKey =  {{ lookup('file', '.keys/server') }}
+SaveConfig = false
+Table = off
+MTU={{ tunnel_mtu }}
+
+[Peer]
+PublicKey = {{ lookup('file', '.keys/'+ item.key +'.pub') }}
+PresharedKey = {{ lookup('file', '.keys/psk') }}
+AllowedIPs = 0.0.0.0/0

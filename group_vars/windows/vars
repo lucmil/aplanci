@@ -1,0 +1,6 @@
+---
+win_setup_user: '{{ vault_win_setup_user }}'
+win_setup_password: '{{ vault_win_setup_password }}'
+win_client_user: '{{ vault_win_client_user }}'
+win_client_password: '{{ vault_win_client_password }}'
+ansible_password: '{{ vault_win_setup_password }}'

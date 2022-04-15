@@ -1,0 +1,42 @@
+vpnexit1 ansible_host=1.2.3.4 ansible_port=1419 ansible_user='bob' ansible_python_interpeter=/usr/bin/python3
+vpnentry1 ansible_host=3.4.5.6 ansible_port=1419 ansible_user='bob' ansible_python_interpeter=/usr/bin/python3
+vpnvm ansible_host=2.3.4.5 ansible_port=1419 ansible_user='bob' ansible_python_interpeter=/usr/bin/python3
+
+[client]
+
+[home]
+vpnvm
+vpnexit1
+vpnentry1
+
+[vpn_gateway]
+vpnvm
+
+[vpn_client]
+vpnexit1
+vpnentry1
+
+[vpn_exit]
+vpnexit1
+
+[vpn_entry]
+vpnentry1
+
+[pvs1]
+
+[pvs:children]
+pvs1
+
+[vpn:children]
+vpn_gateway
+vpn_client
+
+[all_groups:children]
+vpn
+pvs
+client
+
+[home:children]
+vpn
+pvs
+client

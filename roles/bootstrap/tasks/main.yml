@@ -1,0 +1,133 @@
+- name: install sudo
+  package:
+    name: ['sudo']
+    state: latest
+
+- name: remove ufw (Debian 11)
+  package:
+    name: ['ufw']
+    state: absent
+
+- name: disable password for wheel group (CentOS)
+  lineinfile:
+    path: /etc/sudoers
+    regexp: '^%wheel'
+    insertafter: '^#%wheel '
+    line: '%wheel        ALL=(ALL)       NOPASSWD: ALL'
+    validate: /usr/sbin/visudo -c -f %s
+  when:
+    - passwordless_sudo is defined and passwordless_sudo == true
+    - ansible_facts['distribution'] == "CentOS" or ansible_facts['distribution'] == "Fedora"
+
+- name: disable password for sudo group (Debian 10)
+  lineinfile:
+    path: /etc/sudoers
+    regexp: '^%sudo'
+    insertafter: '^#%sudo'
+    line: '%sudo        ALL=(ALL)       NOPASSWD: ALL'
+    validate: /usr/sbin/visudo -c -f %s
+  when:
+    - passwordless_sudo is defined and passwordless_sudo == true
+    - ansible_facts['distribution'] == "Debian"
+    - ansible_facts['distribution_major_version'] >= "10"
+
+- name: create a setup user (CentOS)
+  user:
+    name: '{{ setup_user }}'
+    group: users
+    groups: wheel
+    append: true
+    password: '{{ setup_password }}'
+  when:
+    - ansible_facts['distribution'] == "CentOS" or ansible_facts['distribution'] == "Fedora"
+
+- name: create a setup user (Debian 10)
+  user:
+    name: '{{ setup_user }}'
+    group: users
+    groups: sudo
+    append: true
+    password: '{{ setup_password }}'
+  when:
+    - ansible_facts['distribution'] == "Debian"
+    - ansible_facts['distribution_major_version'] >= "10"
+
+- name: create .ssh directory 
+  file:
+    path: '/home/{{setup_user}}/.ssh'
+    state: directory
+    mode: '0700'
+    owner: '{{ setup_user }}'
+
+- name: install pubkey
+  copy:
+    src: 'templates/home/setup_user/.ssh/authorized_keys'
+    dest: '/home/{{setup_user}}/.ssh/authorized_keys'
+    mode: '0700' 
+    owner: '{{ setup_user }}'
+
+- name: add label the ssh port
+  command: "semanage port -a -t ssh_port_t -p tcp {{ ssh_port }}"
+  ignore_errors: true
+  when:
+    - ansible_facts['distribution'] == "Fedora"
+
+- name: move ssh to a different port
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^Port '
+    insertafter: '^#Port '
+    line: Port {{ ssh_port }}
+    validate: /usr/sbin/sshd -T -f %s
+
+- name: disable password authentication over ssh
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^AuthenticationMethods '
+    insertafter: '^#AuthenticationMethods '
+    line: AuthenticationMethods publickey
+    validate: /usr/sbin/sshd -T -f %s
+
+- name: disable root login
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^PermitRootLogin '
+    insertafter: '^#PermitRootLogin '
+    line: PermitRootLogin no
+    validate: /usr/sbin/sshd -T -f %s
+
+- name: Allow related and established connections
+  ansible.builtin.iptables:
+    chain: INPUT
+    ctstate: ESTABLISHED,RELATED
+    jump: ACCEPT
+  become: yes
+
+- name: Allow new incoming SYN packets on TCP port for ansible (SSH)
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: "{{ ansible_port }}"
+    ctstate: NEW
+    syn: match
+    jump: ACCEPT
+    comment: Accept new SSH connections.
+
+- name: Iptables flush filter
+  ansible.builtin.iptables:
+    chain: "{{ item }}"
+    flush: yes
+  with_items:  [ 'INPUT', 'FORWARD', 'OUTPUT' ]
+
+- name: Iptables flush nat
+  ansible.builtin.iptables:
+    table: nat
+    chain: '{{ item }}'
+    flush: yes
+  with_items: [ 'INPUT', 'OUTPUT', 'PREROUTING', 'POSTROUTING' ]
+
+
+- name: restart sshd
+  ansible.builtin.service:
+    name: sshd
+    state: restarted

@@ -1,0 +1,14 @@
+[Match]
+Name={{ interface }}
+
+[Network]
+Address={{ address }}
+DNS={{ ns }}
+
+{% if address is not match("^"+ gw) %}
+[Route]
+Gateway={{ gw }}
+{% endif %}
+
+[Link]
+MTUBytes={{ tunnel_mtu }}

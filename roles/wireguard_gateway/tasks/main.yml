@@ -1,0 +1,26 @@
+- name: setup wireguard interface
+  template:
+    src: templates/etc/systemd/network/99-wg.network.j2
+    dest: "/etc/systemd/network/99-{{ item.value.interface }}.network"
+  loop: "{{ vpn_peers | dict2items }}"
+  notify:
+    - restart network
+
+- name: generate server config
+  template:
+    src: templates/etc/wireguard/wg0.conf.j2
+    dest: "/etc/wireguard/{{ item.value.interface }}.conf"
+  loop: "{{ vpn_peers | dict2items }}"
+
+- name: enable wireguard
+  ansible.builtin.service:
+    name: "wg-quick@{{ item.value.interface }}"
+    state: started
+    enabled: true
+  loop: "{{ vpn_peers | dict2items }}"
+
+- name: restart wireguard
+  ansible.builtin.service:
+    name: "wg-quick@{{ item.value.interface }}"
+    state: restarted
+  loop: "{{ vpn_peers | dict2items }}"

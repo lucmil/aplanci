@@ -1,0 +1,10 @@
+[Match]
+Name={{ item.value.interface }}
+
+[Address]
+Address={{ item.value.gw }}/32
+
+[Route]
+Destination = {{ item.value.client }}/32
+Scope=link
+

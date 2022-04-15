@@ -1,0 +1,198 @@
+---
+- name: Gather the package facts
+  package_facts:
+    manager: auto
+
+- name: disable persistent logs
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    insertafter: "[Journal]"
+    regexp: "^Storage="
+    line: "Storage=volatile"
+
+- name: set hard limit on log size
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    insertafter: "[Journal]"
+    regexp: "^SystemMaxUse="
+    line: "SystemMaxUse=5M"
+
+- name: set hard limit on runtime log size
+  lineinfile:
+    path: /etc/systemd/journald.conf
+    insertafter: "[Journal]"
+    regexp: "^RuntimeMaxUse="
+    line: "RuntimeMaxUse=5M"
+
+- name: apply changes
+  service:
+    name: systemd-journald
+    state: restarted
+    enabled: yes
+
+- name: remove resolv.conf
+  file:
+    path: /etc/resolv.conf
+    state: absent
+
+- name: recreate resolv.conf
+  lineinfile:
+    path: /etc/resolv.conf
+    regexp: "^nameserver"
+    line: "nameserver 1.1.1.1"
+    create: yes
+
+- name: disable boot delay
+  lineinfile:
+    path: /etc/default/grub
+    regexp: "^GRUB_TIMEOUT"
+    line: "GRUB_TIMEOUT=0"
+
+- name: apply grub configuration changes (Debian)
+  command: update-grub
+  args:
+    warn: no
+  when:
+    - ansible_facts['distribution'] == "Debian"
+    - ansible_facts['distribution_major_version'] >= "10"
+
+- name: apply grub configuration changes (Fedora)
+  shell: grub2-mkconfig > $(readlink -e /etc/grub2.cfg)
+  args:
+    warn: no
+  when:
+    - ansible_facts['distribution'] == "Fedora"
+    - ansible_facts['distribution_major_version'] >= "35"
+
+- name: disable ntp
+  service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  ignore_errors: yes
+  loop: [ 'chrony', 'systemd-timesyncd' ]
+
+- name: install epel and elrepo (CentOS)
+  package:
+    name: ['epel-release', 'elrepo-release', 'NetworkManager-config-server']
+    state: latest
+  when:
+    - ansible_facts['distribution'] == "CentOS"
+    - ansible_facts['distribution_major_version'] == "8"
+
+  notify:
+    - clear package manager cache
+    - restart network
+
+- name: install backports (Debian 10)
+  copy:
+    src: templates/etc/apt/sources.list.d
+    dest: /etc/apt
+  when:
+    - ansible_facts['distribution'] == "Debian"
+    - ansible_facts['distribution_major_version'] == "10"
+
+  notify:
+    - clear package manager cache
+
+- name: refresh package cache
+  command: apt update
+  args:
+    warn: no
+  when:
+    - ansible_facts['distribution'] == "Debian"
+
+- name: install linux kernel 5 (Debian 10)
+  package:
+    name: ['linux-image-5.10.0-0.bpo.3-amd64']
+    state: latest
+  when:
+    - ansible_facts['distribution'] == "Debian"
+    - ansible_facts['distribution_major_version'] == "10"
+    - (ansible_facts.packages | select('match', '^linux-image-5.10.0') | list) is not any
+
+  notify:
+    - clear package manager cache
+
+- name: install linux kernel 5 (Debian 10)
+  package:
+    name: ['linux-headers-5.10.0-0.bpo.3-amd64']
+    state: latest
+  when:
+    - ansible_facts['distribution'] == "Debian"
+    - ansible_facts['distribution_major_version'] == "10"
+    - (ansible_facts.packages | select('match', '^linux-headers-5.10.0') | list) is not any
+
+  notify:
+    - clear package manager cache
+
+- name: update all packages
+  package:
+    name: '*'
+    state: latest
+  notify:
+    - restart machine
+
+- name: install unbound and iptables-persistent (Debian)
+  package:
+    name: ['unbound', 'iptables-persistent']
+    state: latest
+  when:
+    - ansible_facts['distribution'] == "Debian"
+    - ansible_facts['distribution_major_version'] >= "10"
+
+- name: install unbound and iptables-persistent (Fedora)
+  package:
+    name: ['unbound', 'iptables-services']
+    state: latest
+  when:
+    - ansible_facts['distribution'] == "Fedora"
+    - ansible_facts['distribution_major_version'] >= "35"
+
+- name: disable unbound by default
+  service:
+    name: unbound
+    enabled: no
+
+- name: disable ipv6
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.disable_ipv6
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+
+- name: check the public interface is correct
+  vars:
+    interface: "{{ hostvars[inventory_hostname]['ansible_' + hosts[inventory_hostname].interfaces.default.interface] }}"
+  assert:
+    that:
+      - interface is defined
+      - interface.type == 'ether'
+
+- name: initalize networkd configuration for default interface
+  template:
+    src: templates/etc/systemd/network/99-dhcp.network.j2
+    dest: /etc/systemd/network/99-dhcp.network
+  vars:
+    interface: "{{ hostvars[inventory_hostname]['ansible_' + hosts[inventory_hostname].interfaces.default.interface] }}"
+  when:
+    - interface is defined
+    - interface.type == 'ether'
+
+- name: remove dhcp configuration on eth0
+  lineinfile:
+    path: /etc/network/interfaces
+    regexp: "^iface [^ ]+ inet dhcp"
+    state: absent
+
+- name: NetworkManager
+  package:
+    name: ['NetworkManager', 'ufw']
+    state: absent
+
+- name: apply networking changes
+  service:
+    name: systemd-networkd
+    state: restarted
+    enabled: yes

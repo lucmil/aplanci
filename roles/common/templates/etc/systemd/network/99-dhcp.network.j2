@@ -1,0 +1,16 @@
+[Match]
+MACAddress={{ interface.macaddress }}
+
+[Network]
+Address={{ (interface.ipv4.address +"/"+ interface.ipv4.netmask) | ipaddr }}
+
+{% if ansible_default_ipv4.netmask == "255.255.255.255" %}
+[Route]
+Destination={{ ansible_default_ipv4.gateway }}
+Scope=link
+
+{% endif %}
+{% if ansible_default_ipv4.interface == interface.device %}
+[Route]
+Gateway={{ ansible_default_ipv4.gateway }}
+{% endif %}

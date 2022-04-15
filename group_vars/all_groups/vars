@@ -1,0 +1,7 @@
+---
+setup_user: '{{ vault_setup_user }}'
+setup_password: '{{ vault_setup_password }}'
+bootstrap_password: '{{ vault_bootstrap_password }}'
+passwordless_sudo: true
+ssh_port: "1419"
+tunnel_mtu: 1420

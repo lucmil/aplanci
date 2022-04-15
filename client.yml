@@ -1,0 +1,14 @@
+---
+- name: setup windows clients
+  hosts:
+    - client_win
+  roles:
+    - client_win
+
+- name: reboot to apply the changes
+  hosts: all
+  remote_user: root
+  become: yes
+  tasks:
+    - name: reboot
+      reboot:

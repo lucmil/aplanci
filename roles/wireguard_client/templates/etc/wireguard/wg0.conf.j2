@@ -1,0 +1,13 @@
+[Interface]
+PrivateKey = {{ lookup('file', '.keys/'+ inventory_hostname) }}
+Table = off
+MTU={{ tunnel_mtu }}
+
+{% for endpoint in groups['vpn_gateway'] %}
+[Peer]
+PublicKey = {{ lookup('file', '.keys/server.pub') }}
+PresharedKey = {{ lookup('file', '.keys/psk') }}
+AllowedIPs = 0.0.0.0/0
+Endpoint = {{ hostvars[endpoint].ansible_host }}:{{ peer.port }}
+PersistentKeepAlive = 23
+{% endfor %}

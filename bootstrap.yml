@@ -1,0 +1,12 @@
+---
+- name: secure access
+  hosts: debian fedora
+  roles:
+    - bootstrap
+
+- name: secure access (windows)
+  hosts: windows
+  vars:
+    ansible_password: '{{ bootstrap_password }}'
+  roles:
+    - bootstrap_win

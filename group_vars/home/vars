@@ -1,0 +1,57 @@
+---
+pvs: 
+  pvs1:
+    net: "10.10.10.0/24"
+    gw: "10.10.10.1"
+    entry: vpnentry1
+    table: 200
+
+hosts:
+  vpnentry1:
+    pvs: pvs1
+    interfaces:
+      default:
+        interface: eth0
+        ip: "192.168.121.209/24"
+        gw: "192.168.121.1"
+      pvs:
+        interface: eth1
+        ip: "10.10.10.1/24"
+  client1:
+    pvs: pvs1
+    interfaces:
+      default:
+        interface: eth0
+        ip: "192.168.121.171/24"
+        gw: "192.168.121.1"
+      pvs:
+        interface: eth1
+        ip: "10.10.10.2/24"
+  vpnexit1:
+    interfaces:
+      default:
+        interface: eth0
+  vpnvm:
+    interfaces:
+      default:
+        interface: eth0
+
+vpn_net: 10.69.0.0/16
+
+circuits:
+  pvs1:
+    entry: "vpnentry1"
+    exit: "vpnexit1"
+
+vpn_peers:
+  vpnentry1:
+    port: 51820
+    client: 10.69.110.122
+    gw: 10.69.110.221
+    interface: wg0
+  vpnexit1:
+    port: 51821
+    client: 10.69.110.123
+    gw: 10.69.110.132
+    interface: wg1
+    site: pvs1

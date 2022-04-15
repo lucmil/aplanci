@@ -1,0 +1,113 @@
+---
+- name: update all hosts
+  hosts: debian fedora
+  remote_user: root
+  gather_facts: yes
+  become: yes
+  handlers:
+  - name: Restart services
+    import_tasks: handlers/restarts.yml
+  roles:
+    - common
+
+- name: install wireguard
+  hosts: vpn_gateway, vpn_client
+  remote_user: root
+  become: yes
+  handlers:
+  - name: Restart services
+    import_tasks: handlers/restarts.yml
+  roles:
+    - wireguard
+
+- name: provision clients
+  hosts: vpn_client
+  remote_user: root
+  become: yes
+  handlers:
+  - name: Restart services
+    import_tasks: handlers/restarts.yml
+  roles:
+    - wireguard_client
+    - node
+
+- name: enable exit node
+  hosts: vpn_exit
+  remote_user: root
+  become: yes
+  vars:
+    site: "{{ vpn_peers[inventory_hostname].site }}"
+    nat_interface: "{{ hostvars[inventory_hostname].ansible_default_ipv4.interface }}"
+    pvs_networks: "{{ [ site ] | map('extract', pvs, 'net') | list }}"
+    in_interface: "wg0"
+    peers: "{{[ vpn_peers[pvs[ site ].entry].client ]}}"
+    port_forward: "{{ circuits[ site ].forward }}"
+  roles:
+    - firewall
+
+- name: provision gateway
+  hosts: vpn_gateway
+  remote_user: root
+  become: yes
+  handlers:
+  - name: Restart services
+    import_tasks: handlers/restarts.yml
+  vars:
+    udp_ports: "{{ vpn_peers | map('extract', vpn_peers, 'port') | join(',') }}"
+    pvs_networks: "{{ pvs | map('extract', pvs, 'net') | list }}"
+    in_interface: "wg+"
+    peers: "{{ vpn_peers | map('extract', vpn_peers, 'client') | list }}"
+    port_forward: "{{ circuits | map('extract', circuits, 'forward') | select('defined') | sum(start=[]) | list }}"
+  roles:
+    - firewall
+    - wireguard_gateway
+    - router
+    - node
+
+- name: provision pvs gateway
+  hosts: vpn_entry
+  remote_user: root
+  become: yes
+  vars:
+    lan_def: "{{ hosts[inventory_hostname].interfaces.pvs }}"
+    lan: "{{ lan_def }}"
+    lan_if: "{{ lan_def.interface }}"
+    lan_ip: "{{ lan_def.ip | ansible.netcommon.ipaddr('address') }}"
+    lan_net: "{{ lan_def.ip | ansible.netcommon.ipaddr('network') }}/24"
+    udp_ports: "{{ vpn_peers[inventory_hostname].port }}"
+    pvs_networks: "{{ [ hosts[inventory_hostname].pvs ] | map('extract', pvs, 'net') | list }}"
+    in_interface: "{{ lan_def.interface }}"
+    clamp_if: "wg0"
+    port_forward: "{{ circuits[ hosts[inventory_hostname].pvs ].forward }}"
+  handlers:
+  - name: Restart services
+    import_tasks: handlers/restarts.yml
+  roles:
+    - firewall
+    - nameserver
+    - entry
+
+- name: setup pvs
+  hosts:
+    - pvs
+  remote_user: root
+  become: yes
+  vars:
+    address: "{{ hosts[inventory_hostname].interfaces.pvs.ip }}"
+    interface: "{{ hosts[inventory_hostname].interfaces.pvs.interface }}"
+    ns: "{{ pvs[hosts[inventory_hostname].pvs].gw }}"
+    gw: "{{ pvs[hosts[inventory_hostname].pvs].gw }}"
+  handlers:
+  - name: Restart services
+    import_tasks: handlers/restarts.yml
+  roles:
+    - pvs
+    - simpledns
+
+- name: reboot to apply the changes
+  hosts: all
+  remote_user: root
+  become: yes
+  tasks:
+    - name: reboot
+      reboot:

@@ -1,0 +1,38 @@
+- name: install unbound
+  package:
+    name: ['unbound']
+    state: latest
+
+- name: install config
+  template:
+    src: templates/etc/unbound/unbound.conf.j2
+    dest: /etc/unbound/unbound.conf
+
+- name: update anchor
+  shell:
+    cmd: "unbound-anchor"
+
+- name: stop Lennart's toys
+  ignore_errors: true
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: ["resolvconf", "systemd-resolved"]
+
+- name: remove Lennart's fuckery
+  package:
+    name: ["resolvconf", "systemd-resolved"]
+    state: absent
+
+- name: start the nameserver
+  ignore_errors: true
+  ansible.builtin.service:
+    name: "unbound"
+    state: restarted
+    enabled: true
+
+- name: install resolv.conf
+  copy:
+    content: "nameserver 127.0.0.1"
+    dest: /etc/resolv.conf

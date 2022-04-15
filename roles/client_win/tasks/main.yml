@@ -1,0 +1,19 @@
+- name: Set up static IP address
+  vars:
+    interface: '{{ hosts[inventory_hostname].interfaces.pvs }}'
+    ip: '{{ interface.ip | ansible.netcommon.ipaddr("address") }}'
+    prefix: '{{ interface.ip | ansible.netcommon.ipaddr("prefix") }}'
+    gw: '{{ interface.gw | ansible.netcommon.ipaddr("address") }}'
+    name: '{{ interface.interface }}'
+  win_shell: "Get-NetIpAddress -InterfaceAlias '{{ name }}' | New-NetIpAddress -IpAddress {{ ip }} -PrefixLength {{ prefix }} -DefaultGateway {{ gw }}"
+  poll: 0
+  ignore_errors: yes
+
+- name: set dns client
+  vars:
+    interface: '{{ hosts[inventory_hostname].interfaces.pvs }}'
+    gw: '{{ interface.gw | ansible.netcommon.ipaddr("address") }}'
+  win_dns_client:
+    adapter_names: '{{ interface.interface }}'
+    ipv4_addresses: '{{ gw }}' 
+

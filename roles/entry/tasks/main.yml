@@ -1,0 +1,26 @@
+- name: check rt_tables exists
+  file:
+    path: /etc/iproute2/rt_tables
+    state: file
+
+- name: add pvs routing table
+  lineinfile:
+    path: /etc/iproute2/rt_tables
+    line: 200 pvs
+  notify:
+    - restart network
+
+- name: lock down default route
+  template:
+    src: templates/etc/systemd/network/99-dhcp.network.j2
+    dest: /etc/systemd/network/99-dhcp.network
+  notify:
+    - restart network
+  vars:
+    macaddress: "{{ hostvars[inventory_hostname][ 'ansible_' + hosts[inventory_hostname].interfaces.default.interface ].macaddress }}"
+    ip: "{{ hosts[inventory_hostname].interfaces.default.ip }}"
+    gw: "{{ hosts[inventory_hostname].interfaces.default.gw }}"
+    vpn_gateway: "{{ hostvars[ item ].ansible_host }}"
+  with_inventory_hostnames:
+    - vpn_gateway
+

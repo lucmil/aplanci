@@ -1,0 +1,21 @@
+- name: install iptables-persistent
+  package:
+    name: ['iptables-persistent']
+    state: latest
+
+- name: Create rule config
+  vars:
+    ipv4: "{{ hostvars[inventory_hostname].ansible_default_ipv4 }}"
+    address: "{{ ipv4.address }}"
+    network: "{{ ipv4.network }}"
+    netmask: "{{ ipv4.netmask }}"
+    interface: "{{ ipv4.interface }}"
+  template:
+    src: templates/etc/iptables/rules.v4.j2
+    dest: /etc/iptables/rules.v4
+
+- name: Load rules
+  service:
+    name: 'netfilter-persistent'
+    state: restarted
+    enabled: yes

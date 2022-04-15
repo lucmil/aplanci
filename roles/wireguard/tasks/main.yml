@@ -1,0 +1,16 @@
+- name: install wireguard (CentOS)
+  package:
+    name: ['kmod-wireguard', 'wireguard-tools']
+    state: latest
+  when:
+    - ansible_facts['distribution'] == "CentOS"
+    - ansible_facts['distribution_major_version'] == "8"
+
+- name: install wireguard (Debian)
+  package:
+    name: ['wireguard']
+    state: latest
+  when:
+    - ansible_facts['distribution'] == "Debian"
+    - ansible_facts['distribution_major_version'] >= "10"
+  ignore_errors: true

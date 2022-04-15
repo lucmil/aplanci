@@ -1,0 +1,24 @@
+---
+- name: enable forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+
+- name: enable ICMP black hole discovery
+  ansible.posix.sysctl:
+    name: net.ipv4.tcp_mtu_probing
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+
+- name: increase base MSS
+  ansible.posix.sysctl:
+    name: net.ipv4.tcp_base_mss
+    value: '1024'
+    sysctl_set: yes
+    state: present
+    reload: yes

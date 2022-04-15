@@ -1,0 +1,61 @@
+- name: check rt_tables exists
+  file:
+    path: /etc/iproute2/rt_tables
+    state: file
+
+- name: add pvs routing table
+  lineinfile:
+    path: /etc/iproute2/rt_tables
+    line: "{{ item.value.table }} {{ item.key }}"
+  loop: "{{ pvs | dict2items }}"
+
+- name: add pvs route
+  vars:
+    entry: "{{ vpn_peers[item.value.entry].client }}"
+    interface: "{{ vpn_peers[item.value.entry].interface }}"
+    net: "{{ pvs[item.key].net }}"
+    table: "{{ pvs[item.key].table }}"
+  blockinfile:
+    dest: "/etc/systemd/network/99-{{ interface }}.network"
+    block: |
+      [Route]
+      Table={{ table }}
+      Destination={{ net }}
+      Gateway={{ entry }}
+      GatewayOnlink=true
+
+      [RoutingPolicyRule]
+      Table={{ table }}
+      From={{ net }}
+      Priority=1000
+
+      [RoutingPolicyRule]
+      Table={{ table }}
+      To={{ net }}
+      Priority=1001
+
+      [RoutingPolicyRule]
+      Table={{ table }}
+      From={{ entry }}
+      Priority=1002
+  loop: "{{ circuits | dict2items }}"
+  notify:
+    - restart network
+
+- name: add pvs route
+  vars:
+    host: "{{ vpn_peers[item.value.exit] }}"
+    table: "{{ pvs[item.key].table }}"
+  blockinfile:
+    dest: "/etc/systemd/network/99-{{ host.interface }}.network"
+    block: |
+      [Route]
+      Table={{ table }}
+      Destination=0.0.0.0/0
+      Gateway={{ host.gw }}
+  loop: "{{ circuits | dict2items }}"
+  notify:
+    - restart network
+
+- name: Flush handlers
+  meta: flush_handlers

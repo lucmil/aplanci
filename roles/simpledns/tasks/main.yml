@@ -1,0 +1,17 @@
+- name: stop Lennart's toys
+  ignore_errors: true
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop: ["resolvconf", "systemd-resolved"]
+
+- name: remove Lennart's fuckery
+  package:
+    name: ["resolvconf", "systemd-resolved"]
+    state: absent
+
+- name: install resolv.conf
+  copy:
+    content: "nameserver {{ ns | default('127.0.0.1') }}"
+    dest: /etc/resolv.conf

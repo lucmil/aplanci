@@ -1,0 +1,80 @@
+server:
+	verbosity: 0
+	username: "unbound"
+	directory: "/var/lib/unbound"
+	chroot: "/var/lib/unbound"
+	pidfile: "/var/run/unbound.pid"
+	num-threads: 1
+	msg-cache-slabs: 1
+	rrset-cache-slabs: 1
+	infra-cache-slabs: 1
+	key-cache-slabs: 1
+	interface: {{ lan_ip }}
+	interface: 127.0.0.1
+	access-control: 127.0.0.0/8 allow
+	access-control: {{ lan_net }} allow
+	access-control: 0.0.0.0/0 refuse
+	access-control: ::1 allow
+	access-control: ::0/0 refuse
+	outgoing-num-tcp: 1
+	incoming-num-tcp: 1
+	outgoing-port-permit: "10240-65335"
+	outgoing-range: 60
+	num-queries-per-thread: 120
+	msg-buffer-size: 16384
+	infra-cache-numhosts: 400
+	msg-cache-size: 200k
+	rrset-cache-size: 200k
+	key-cache-size: 200k
+	neg-cache-size: 20k
+	target-fetch-policy: "2 1 0 0 0 0"
+	harden-large-queries: yes
+	harden-short-bufsize: yes
+	module-config: "validator iterator"
+	auto-trust-anchor-file: "/var/lib/unbound/root.key"
+	domain-insecure: "pool.ntp.org"
+	prefer-ip6: no
+	do-ip6: no
+	do-udp: yes
+	do-tcp: yes
+	hide-identity: yes
+	hide-version: yes
+	hide-trustanchor: yes
+	harden-short-bufsize: yes
+	harden-large-queries: yes
+	harden-glue: yes
+	harden-dnssec-stripped: yes
+	harden-below-nxdomain: yes
+	qname-minimisation: yes
+	qname-minimisation-strict: yes
+	aggressive-nsec: yes
+	prefetch: yes
+	prefetch-key: yes
+	rrset-roundrobin: yes
+	insecure-lan-zones: no
+	tls-upstream: yes
+        tls-cert-bundle: "/etc/ssl/certs/ca-certificates.crt"
+
+	local-zone: "localhost." static
+	local-data: "localhost. 10800 IN NS localhost."
+	local-data: "localhost. 10800 IN SOA localhost. nobody.invalid. 1 3600 1200 604800 10800"
+	local-data: "localhost. 10800 IN A 127.0.0.1"
+	local-zone: "127.in-addr.arpa." static
+	local-data: "127.in-addr.arpa. 10800 IN NS localhost."
+	local-data: "127.in-addr.arpa. 10800 IN SOA localhost. nobody.invalid. 2 3600 1200 604800 10800"
+	local-data: "1.0.0.127.in-addr.arpa. 10800 IN PTR localhost."
+	local-zone: "fbcdn.net." always_nxdomain
+
+python:
+remote-control:
+	control-enable: no
+	control-interface: ::1
+	control-port: 8953
+	control-use-cert: "yes"
+
+forward-zone:
+        name: "."
+        forward-addr: 1.1.1.1@853#cloudflare-dns.com
+        forward-addr: 1.0.0.1@853#cloudflare-dns.com
+        forward-tls-upstream: yes
+

@@ -1,0 +1,16 @@
+[Match]
+Name=wg0
+
+[Address]
+Address={{ peer.client }}/24
+
+{% if peer.site is defined %}
+# exit
+[Route]
+Gateway = {{ peer.gw }}
+Destination = {{ pvs[peer.site].net }}
+{% else %}
+# entry
+[Route]
+Gateway={{ peer.gw }}
+{% endif %}

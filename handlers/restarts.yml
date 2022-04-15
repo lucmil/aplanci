@@ -1,0 +1,47 @@
+- name: restart machine
+  debug:
+    msg: "Would've restarted"
+#  ansible.builtin.reboot:
+
+- name: clear package manager cache
+  command: dnf clean metadata
+  args:
+    warn: no
+  when:
+    - ansible_facts['distribution'] == "CentOS"
+    - ansible_facts['distribution_major_version'] == "8"
+
+- name: clear package manager cache
+  command: apt update
+  args:
+    warn: no
+  listen: "clear package manager cache"
+  when:
+    - ansible_facts['distribution'] == "Debian"
+
+- name: restart NetworkManager
+  ansible.builtin.service:
+    name: NetworkManager
+    state: restarted
+  listen: "restart network"
+  when:
+    - (ansible_facts['distribution'] == "CentOS" and ansible_facts['distribution_major_version'] >= "8")
+
+- name: restart networkd
+  ansible.builtin.service:
+    name: systemd-networkd
+    state: started
+  listen: "restart network"
+  when:
+    - (ansible_facts['distribution'] == "Debian" and ansible_facts['distribution_major_version'] >= "10") or
+      (ansible_facts['distribution'] == "Debian" and ansible_facts['distribution_major_version'] == "testing")
+
+- name: restart networkd
+  ansible.builtin.service:
+    name: networking
+    state: started
+  listen: "restart network"
+  ignore_errors: true
+  when:
+    - (ansible_facts['distribution'] == "Debian" and ansible_facts['distribution_major_version'] >= "10") or
+      (ansible_facts['distribution'] == "Debian" and ansible_facts['distribution_major_version'] == "testing")

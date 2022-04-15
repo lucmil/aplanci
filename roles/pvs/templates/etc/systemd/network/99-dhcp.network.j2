@@ -1,0 +1,12 @@
+[Match]
+MACAddress={{ interface.macaddress }}
+
+[Network]
+Address={{ (interface.address +"/"+ interface.netmask)  | ipaddr }}
+
+{% for endpoint in groups['vpn_gateway'] %}
+[Route]
+GatewayOnLink=true
+Destination={{ hostvars[endpoint].ansible_host }}
+Gateway={{ interface.gateway }}
+{% endfor %}

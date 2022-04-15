@@ -1,0 +1,4 @@
+/.vagrant
+/.keys
+**/vault
+**/*.swp

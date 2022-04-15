@@ -1,0 +1,82 @@
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [5:300]
+:OUTPUT ACCEPT [1452:124756]
+{% if udp_ports is defined %}
+-A INPUT -d {{ address }} -m udp -p udp -m multiport --dports {{ udp_ports }}  -j ACCEPT
+{% endif %}
+-A INPUT -p udp -m udp --sport 53 -j ACCEPT
+-A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+# check if this can be removed
+#{% if udp_ports is defined %}
+#-A INPUT -i {{ in_interface }} -j ACCEPT
+#{% endif %}
+
+{% if lan_net is defined and lan_if is defined %}
+-A INPUT -i {{ lan_if }} -s {{ lan_net }} -p udp --dport 53 -j ACCEPT
+{% endif %}
+
+-A INPUT -m conntrack --ctstate INVALID -j DROP
+{% for icmptype in [ "0", "3", "8", "11", "12" ] %}
+-A INPUT -p icmp -m icmp --icmp-type {{ icmptype }} -j ACCEPT
+-A FORWARD -i {{ in_interface }} -p icmp -m icmp --icmp-type {{ icmptype }} -j ACCEPT
+{% endfor %}
+-A INPUT -p tcp -m tcp --dport {{ ansible_port }} -m conntrack --ctstate NEW -j ACCEPT
+-A INPUT -s {{ network }}/{{ netmask }} -i {{ interface }} -j ACCEPT
+-A INPUT -p udp -j REJECT --reject-with icmp-port-unreachable
+-A INPUT -p tcp -j REJECT --reject-with tcp-reset
+-A INPUT -j REJECT --reject-with icmp-proto-unreachable
+
+{% if nat_interface is defined %}
+-A FORWARD -o {{ nat_interface }} -p tcp -m tcp --dport 53 -j DROP
+-A FORWARD -o {{ nat_interface }} -p udp -m udp --dport 53 -j DROP
+{% endif %}
+
+-A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -m conntrack --ctstate INVALID -j DROP
+{% if pvs_networks is defined %}
+{% for net in pvs_networks %}
+-A FORWARD -i {{ in_interface }} -s {{ net }} -m conntrack --ctstate NEW -j ACCEPT
+{% endfor %}
+{% endif %}
+
+{% if peers is defined %}
+{% for peer in peers %}
+-A FORWARD -i wg+ -s {{ peer }} -m conntrack --ctstate NEW -j ACCEPT
+{% endfor %}
+{% endif %}
+
+{% if port_forward is defined %}
+{% for pf_item in port_forward %}
+-A FORWARD -p {{ pf_item.proto }} --dport {{ pf_item.port }} -d {{ pf_item.dst }} -m conntrack --ctstate NEW -j ACCEPT
+{% endfor %}
+{% endif %}
+
+-A FORWARD -j REJECT --reject-with icmp-host-unreachable
+COMMIT
+{% if nat_interface is defined %}
+*nat
+:PREROUTING ACCEPT [5:249]
+{% if port_forward is defined %}
+{% for pf_item in port_forward %}
+-A PREROUTING -i {{ nat_interface }} -p {{ pf_item.proto }} --dport {{ pf_item.port }} -j DNAT --to {{ pf_item.dst }}:{{ pf_item.port }}
+{% endfor %}
+{% endif %}
+:INPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+-A POSTROUTING -o {{ nat_interface }} -j SNAT --to-source {{ ansible_host }}
+COMMIT
+{% endif %}
+*mangle
+:PREROUTING ACCEPT [2041:1930844]
+:INPUT ACCEPT [1954:1923588]
+:FORWARD ACCEPT [23:1380]
+:OUTPUT ACCEPT [1452:124756]
+:POSTROUTING ACCEPT [1470:125836]
+{% if clamp_if is defined %}
+-A FORWARD -p tcp --tcp-flags SYN,RST SYN -o {{ clamp_if }} -j TCPMSS --set-mss {{ tunnel_mtu }}
+{% endif %}
+COMMIT
+

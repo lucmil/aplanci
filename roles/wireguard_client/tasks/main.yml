@@ -1,0 +1,27 @@
+- name: setup wireguard interface
+  vars:
+    peer: "{{ vpn_peers[inventory_hostname] }}"
+  template:
+    src: templates/etc/systemd/network/99-wg.network.j2
+    dest: /etc/systemd/network/99-wg0.network
+  notify:
+    - restart network
+
+- name: generate client config
+  vars:
+    peer: "{{ vpn_peers[inventory_hostname] }}"
+  template:
+    src: templates/etc/wireguard/wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+
+- name: enable wireguard
+  ansible.builtin.service:
+    name: wg-quick@wg0
+    state: started
+    enabled: true
+
+- name: restart wireguard
+  ansible.builtin.service:
+    name: wg-quick@wg0
+    state: restarted
+
